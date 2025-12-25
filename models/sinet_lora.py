@@ -39,25 +39,26 @@ class ViT_lora_co(VisionTransformer):
 
 
 def _create_vision_transformer(variant, pretrained=False, **kwargs):
-    if kwargs.get('features_only', None):
-        raise RuntimeError('features_only not implemented for Vision Transformer models.')
+    from functools import partial
+    model = ViT_lora_co(num_classes=0, patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
 
-    # NOTE this extra code to support handling of repr size for in21k pretrained models
-    # pretrained_cfg = resolve_pretrained_cfg(variant, kwargs=kwargs)
-    pretrained_cfg = resolve_pretrained_cfg(variant)
-    default_num_classes = pretrained_cfg['num_classes']
-    num_classes = kwargs.get('num_classes', default_num_classes)
-    repr_size = kwargs.pop('representation_size', None)
-    if repr_size is not None and num_classes != default_num_classes:
-        repr_size = None
+    if pretrained:
+        import timm
+        variant = 'vit_base_patch16_224.augreg_in21k_ft_in1k'
+        pretrained_vit = timm.create_model(variant, pretrained=True)
+        pretrained_state = pretrained_vit.state_dict()
+        incompatible = model.load_state_dict(pretrained_state, strict=False)
 
-    model = build_model_with_cfg(
-        ViT_lora_co, variant, pretrained,
-        pretrained_cfg=pretrained_cfg,
-        representation_size=repr_size,
-        pretrained_filter_fn=checkpoint_filter_fn,
-        pretrained_custom_load='npz' in pretrained_cfg['url'],
-        **kwargs)
+        missing_keys = set(incompatible.missing_keys)
+        unexpected_keys = set(incompatible.unexpected_keys)
+
+        # 4. Freeze các param được match
+        for name, param in model.named_parameters():
+            if name not in missing_keys:
+                # key match giữa model và pretrained
+                param.requires_grad = False
+        return model
     return model
 
 
@@ -68,7 +69,7 @@ class SiNet(nn.Module):
 
         model_kwargs = dict(patch_size=16, embed_dim=768, depth=12, num_heads=12, n_tasks=args["total_sessions"],
                             rank=args["rank"])
-        self.image_encoder = _create_vision_transformer('vit_base_patch16_224_in21k', pretrained=True, **model_kwargs)
+        self.image_encoder = _create_vision_transformer('vit_base_patch16_224.augreg_in21k_ft_in1k', pretrained=True, **model_kwargs)
         # print(self.image_encoder)
         # exit()
 
