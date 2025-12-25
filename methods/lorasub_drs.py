@@ -133,6 +133,7 @@ class LoRAsub_DRS(BaseLearner):
 
                 for module in self._network.modules():
                     if isinstance(module, Attention_LoRA):
+                        # NOTE: Bản chất cur_matrix là cumulative co-variance E x E của các feature tại task t
                         self.fea_in[module.lora_A_k[self._cur_task].weight] = deepcopy(module.cur_matrix).to(
                             self._device)
                         self.fea_in[module.lora_A_v[self._cur_task].weight] = deepcopy(module.cur_matrix).to(
@@ -141,11 +142,11 @@ class LoRAsub_DRS(BaseLearner):
                             self._device)
                         self.fea_in[module.lora_B_v[self._cur_task].weight] = deepcopy(module.cur_matrix).to(
                             self._device)
-                        module.cur_matrix.zero_()
+                        module.cur_matrix.zero_() # NOTE: reser cur_matrix
                         module.matrix_kv = 0
                         module.n_cur_matrix = 0
 
-            self.init_model_optimizer()
+            self.init_model_optimizer() # NOTE: khởi tạo optimizer với lr của LoRA và lr của classifier là 2 giá trị khác nhau
             if self._cur_task == 0:
                 self.run_epoch = self.init_epoch
             else:
@@ -178,7 +179,7 @@ class LoRAsub_DRS(BaseLearner):
                 loss = F.cross_entropy(logits, targets)
                 ATL = criterion(feature, labels, self._protos)
                 loss += self.lambada * ATL
-
+                # NOTE: Hàm loss này đảm bảo model vừa classify tốt, vừa tăng khoảng cách giữa các feature khác lớp
                 self.model_optimizer.zero_grad()
                 loss.backward()
 
@@ -259,8 +260,9 @@ class LoRAsub_DRS(BaseLearner):
 
         fea_params = [p for n, p in self._network.named_parameters() if
                       not bool(re.search('classifier_pool', n)) and p.requires_grad == True]
-
+        # NOTE: fea_params là các tham số của LoRA
         cls_params = [p for n, p in self._network.named_parameters() if bool(re.search('classifier_pool', n))]
+        # NOTE: cls_params là các tham số của tầng classifier
         model_optimizer_arg = {'params': [{'params': fea_params, 'svd': True, 'lr': lr,
                                            'thres': 0.99},
                                           {'params': cls_params, 'weight_decay': self.weight_decay,

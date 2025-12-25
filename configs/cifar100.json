@@ -1,5 +1,6 @@
 {
     "prefix": "reproduce",
+    "device" : "cuda",
     "dataset": "cifar100",
     "data_path": "data/",
     "memory_size": 0,

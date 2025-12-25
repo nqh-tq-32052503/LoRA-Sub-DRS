@@ -261,6 +261,7 @@ class Attention_LoRA(nn.Module):
                 dim=0).cpu()) / (self.n_matrix + x.shape[0] * x.shape[1])
             self.n_matrix += x.shape[0] * x.shape[1]
         if get_cur_x:
+            # NOTE: LoRA Subtraction
             rate = 1
             self.cur_matrix = (self.cur_matrix * self.n_cur_matrix + torch.bmm(x0.detach().permute(0, 2, 1),
                                                                                x0.detach()).sum(dim=0).cpu()) / (
@@ -278,6 +279,7 @@ class Attention_LoRA(nn.Module):
             v = v - F.linear(x, weight_v_old).reshape(B, N, self.num_heads,
                                                                  C // self.num_heads).permute(0, 2, 1, 3)
         else:
+            # NOTE: Normal Attention LoRA
             if task > -0.5:
                 weight_k = torch.stack(
                     [torch.mm(self.lora_B_k[t].weight, self.lora_A_k[t].weight) for t in range(task + 1)],

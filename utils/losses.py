@@ -30,11 +30,15 @@ class AugmentedTripletLoss(nn.Module):
         num_proto = len(center)
         dist_ap, dist_an = [], []
         for i in range(n):
+            # NOTE: Lấy ra các phần tử trong batch mà thuộc cùng một class
+            # NOTE: dist[i][mask[i]] là khoảng cách từ mẫu i đến các mẫu cùng class
+            # NOTE: dist_ap là khoảng cách xa nhất giữa hai mẫu cùng lớp 
             dist_ap.append(dist[i][mask[i]].max().unsqueeze(0))
             if dist[i][mask[i] == 0].numel() == 0:
                 dist_an.append((dist[i][mask[i]].max()+self.margin).unsqueeze(0))
             else:
                 dist_an.append(dist[i][mask[i] == 0].min().unsqueeze(0))
+            # NOTE: dist_an là khoảng cách gần nhất giữa hai mẫu khác lớp
         dist_ap = torch.cat(dist_ap)
         if num_proto > 0:
             center = torch.from_numpy(center / np.linalg.norm(center, axis=1)[:, None]).to(device)
@@ -42,9 +46,10 @@ class AugmentedTripletLoss(nn.Module):
                 for j in range(num_proto):
                     distp = torch.norm(inputs[i].unsqueeze(0) - center[j], self.norm).clamp(min=1e-12)
                     dist_an[i] = min(dist_an[i].squeeze(0), distp).unsqueeze(0)
+                    # NOTE: So sánh khoảng cách từ mẫu i đến các prototype center với khoảng cách gần nhất đến các mẫu khác lớp
         dist_an = torch.cat(dist_an)
         # Compute ranking hinge loss
-        y = torch.ones_like(dist_an)
+        y = torch.ones_like(dist_an) # NOTE: y = 1 để đảm bảo dist_an > dist_ap
         loss = self.ranking_loss(dist_an, dist_ap, y)
         return loss
 

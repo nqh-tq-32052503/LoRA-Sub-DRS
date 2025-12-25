@@ -77,9 +77,11 @@ class Adam(Optimizer):
                     raise RuntimeError(
                         'Adam does not support sparse gradients, please consider SparseAdam instead')
 
-                update = self.get_update(group, grad, p)
+                update = self.get_update(group, grad, p) # NOTE: Là phiên bản gốc của Adam
 
                 if svd and len(self.transforms) > 0:
+                    # NOTE: self.transforms là ma trận chiếu được tạo ra từ các vector riêng
+                    # NOTE: chiếu tham số dùng để update tham số Adam lên không gian con
                     if len(update.shape) == 4:
                         # the transpose of the manuscript
                         update_ = torch.mm(update.view(update.size(
@@ -102,6 +104,7 @@ class Adam(Optimizer):
                 continue
 
             for p in group['params']:
+                # NOTE: thres là ngưỡng quyết định bao nhiêu % thông tin được giữ lại
                 thres = group['thres']
                 if p.requires_grad == False or thres == 1.0:
                     continue
@@ -114,6 +117,7 @@ class Adam(Optimizer):
                     cumulative_sum[num_vectors - 1]
                 ))
                 basis = self.eigens[p]['eigen_vector'][:, :num_vectors]
+                # NOTE: basis là cơ sở con của tập vector riêng được lấy ra dựa theo % thông tin
                 transform = torch.mm(basis, basis.transpose(1, 0))
                 self.transforms[p] = transform / torch.norm(transform)
                 self.transforms[p].detach_()
@@ -128,12 +132,16 @@ class Adam(Optimizer):
                 if p.requires_grad == False:
                     continue
                 eigen = self.eigens[p]
+                # NOTE: Bản chất fea_in[p] là ma trận covariance của tập B feature vector nên 
+                # phép torch.svd trả về giá trị riêng và vector riêng ma trận này,
+                # trong đó giá trị riêng đại diện cho %thông tin của feature
                 _, eigen_value, eigen_vector = torch.svd(fea_in[p], some=False)
                 eigen['eigen_value'] = eigen_value
                 eigen['eigen_vector'] = eigen_vector
 
     def get_update(self, group, grad, p):
-        amsgrad = group['amsgrad']
+        # NOTE: copy từ torch.optim.Adam, chỉ thêm hàm get_update để tiện cho việc chỉnh sửa
+        amsgrad = group['amsgrad'] # NOTE: luôn là False
         state = self.state[p]
         # State initialization
         if len(state) == 0:

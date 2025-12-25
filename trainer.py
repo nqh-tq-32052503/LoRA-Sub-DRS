@@ -14,12 +14,10 @@ import numpy as np
 def train(args):
     seed_list = copy.deepcopy(args['seed'])
     device = copy.deepcopy(args['device'])
-    device = device.split(',')
-
-    for seed in seed_list:
-        args['seed'] = seed
-        args['device'] = device
-        _train(args)
+    # device = device.split(',')
+    args['seed'] = 2025
+    args['device'] = device
+    _train(args)
 
     myseed = 42069  # set a random seed for reproducibility
     torch.backends.cudnn.deterministic = True
